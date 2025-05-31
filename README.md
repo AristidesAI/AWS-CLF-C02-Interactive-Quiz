@@ -10,4 +10,4 @@ Hi there, I was studying for the AWS CLF-C02 certification and found practise te
 - Session Memory; The next time you take the quiz, your previous incorrect answers will be asked again to assist in memorization
 - Interactive elements
 
-### If you like this Quiz, Please follow me on Github ❤️
+### If you like this Quiz, Please follow me on [X/Twitter❤️](https://x.com/aristidesai)
