@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS CLF-C02 Practice Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* bg-gray-100 */
+        }
+        .quiz-container {
+            transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+        }
+        .page-hidden {
+            opacity: 0;
+            transform: translateX(-20px);
+            pointer-events: none;
+            position: absolute; /* Keep it out of flow when hidden */
+        }
+        .page-visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .btn-selected {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 2px #3b82f6; /* Ring-blue-500 */
+        }
+        .btn-correct {
+            outline: 3px solid #22c55e; /* Green-500 */
+            background-color: #dcfce7; /* Green-100 */
+        }
+        .btn-user-selected-incorrect { /* Specific for user's wrong choice */
+             outline: 3px solid #ef4444; /* Red-500 */
+        }
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.6); }
+            70% { box-shadow: 0 0 10px 15px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .correct-answer-pop {
+            animation: pulse-green 0.8s ease-out;
+        }
+        #question-area {
+            transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+        }
+        .question-area-enter { opacity: 0; transform: translateY(20px); }
+        .question-area-exit { opacity: 0; transform: translateY(-20px); }
+        .progress-bar-fill { transition: width 0.5s ease-in-out; }
+        .status-message {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+        .status-success { background-color: #dcfce7; color: #166534; } /* green-100, green-800 */
+        .status-error { background-color: #fee2e2; color: #991b1b; } /* red-100, red-800 */
+        .status-info { background-color: #e0e7ff; color: #3730a3; } /* indigo-100, indigo-800 */
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 bg-slate-100 text-slate-800">
+
+    <div id="quiz-app-container" class="w-full max-w-2xl">
+
+        <div id="start-screen" class="quiz-container page-visible bg-white p-8 rounded-xl shadow-2xl text-center">
+            <h1 class="text-3xl font-bold mb-6 text-blue-600">AWS CLF-C02 Practice Quiz</h1>
+            <p class="mb-8 text-slate-600">
+                Test your knowledge with up to 50 randomized questions. You have 90 minutes. Good luck!
+            </p>
+            <button id="start-quiz-button" class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105">
+                Start Quiz
+            </button>
+            <p id="start-screen-message" class="mt-4 text-sm text-slate-500"></p>
+        </div>
+
+        <div id="quiz-screen" class="quiz-container page-hidden bg-white p-6 sm:p-8 rounded-xl shadow-2xl">
+            <div class="flex justify-between items-center mb-6">
+                <div id="timer" class="text-xl font-semibold text-blue-600 bg-blue-100 px-4 py-2 rounded-lg">Time Left: 90:00</div>
+                <div id="question-counter" class="text-lg font-medium text-slate-500">Question 1/50</div>
+            </div>
+            
+            <div class="w-full bg-slate-200 rounded-full h-2.5 mb-6">
+                <div id="progress-bar" class="bg-blue-500 h-2.5 rounded-full progress-bar-fill" style="width: 0%"></div>
+            </div>
+
+            <div id="question-area" class="mb-6 min-h-[100px]">
+                <h2 id="question-text" class="text-xl sm:text-2xl font-semibold mb-6 text-slate-700 leading-relaxed">Question text will load here...</h2>
+                <div id="answer-options" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+            </div>
+
+            <div id="explanation-area" class="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-slate-700 hidden">
+                <h3 class="font-semibold mb-2 text-blue-600">Explanation:</h3>
+                <p id="explanation-text"></p>
+            </div>
+
+            <div class="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
+                <button id="confirm-button" class="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Confirm
+                </button>
+            </div>
+        </div>
+
+        <div id="results-screen" class="quiz-container page-hidden bg-white p-8 rounded-xl shadow-2xl text-center">
+            <h1 id="results-title" class="text-3xl font-bold mb-4 text-blue-600">Quiz Completed!</h1>
+            <p id="results-score" class="text-5xl font-bold my-6 text-slate-700">Your Score: 0%</p>
+            <p id="results-summary" class="text-lg mb-4 text-slate-600">You answered X out of Y questions correctly.</p>
+            <p id="results-time" class="text-lg mb-6 text-slate-500">Time Taken: 00:00</p>
+            
+            <div class="mt-6 space-y-3 sm:space-y-0 sm:space-x-4 flex flex-col sm:flex-row justify-center">
+                <button id="remember-session-button" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105">
+                    Remember My Incorrect Answers
+                </button>
+                <button id="delete-session-button" class="bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105">
+                    Forget My Incorrect Answers
+                </button>
+            </div>
+             <button id="restart-quiz-button-results" class="mt-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-8 rounded-lg shadow-md hover:shadow-lg transition-all duration-150 ease-in-out transform hover:scale-105">
+                Take Another Quiz
+            </button>
+            <p id="session-status-message" class="status-message hidden"></p>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Question Bank (Each question now has a unique ID) ---
+        const allQuestions = [
+            { id: 0, question: "Which AWS service provides a highly scalable, fully managed NoSQL database service?", options: ["Amazon RDS", "Amazon DynamoDB", "Amazon Redshift", "Amazon Aurora"], correctAnswer: 1, explanation: "Amazon DynamoDB is a key-value and document database that delivers single-digit millisecond performance at any scale." },
+            { id: 1, question: "What AWS service enables you to run code without provisioning or managing servers?", options: ["Amazon EC2", "AWS Lambda", "Amazon Lightsail", "AWS Elastic Beanstalk"], correctAnswer: 1, explanation: "AWS Lambda is a serverless compute service that lets you run code without provisioning or managing servers. You pay only for the compute time you consume." },
+            { id: 2, question: "Which AWS service is used for creating a private network in the AWS cloud?", options: ["Amazon Route 53", "AWS Direct Connect", "Amazon VPC", "AWS VPN"], correctAnswer: 2, explanation: "Amazon Virtual Private Cloud (Amazon VPC) lets you provision a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define." },
+            { id: 3, question: "What is the primary benefit of deploying an application across multiple Availability Zones?", options: ["Reduced cost", "Increased performance", "Enhanced fault tolerance and high availability", "Simplified management"], correctAnswer: 2, explanation: "Deploying across multiple Availability Zones increases the fault tolerance and availability of your application by ensuring it can withstand an AZ failure." },
+            { id: 4, question: "Which AWS service offers content delivery network (CDN) capabilities?", options: ["Amazon S3", "Amazon CloudFront", "AWS Global Accelerator", "Elastic Load Balancing"], correctAnswer: 1, explanation: "Amazon CloudFront is a fast content delivery network (CDN) service that securely delivers data, videos, applications, and APIs to customers globally with low latency and high transfer speeds." },
+            { id: 5, question: "What AWS security service helps protect your web applications from common web exploits?", options: ["AWS Shield", "AWS WAF", "Amazon Inspector", "AWS IAM"], correctAnswer: 1, explanation: "AWS WAF (Web Application Firewall) helps protect your web applications or APIs against common web exploits that may affect availability, compromise security, or consume excessive resources." },
+            { id: 6, question: "Which AWS service provides block-level storage volumes for use with EC2 instances?", options: ["Amazon S3", "Amazon Glacier", "Amazon EFS", "Amazon EBS"], correctAnswer: 3, explanation: "Amazon Elastic Block Store (EBS) provides persistent block storage volumes for use with Amazon EC2 instances." },
+            { id: 7, question: "What is the AWS Well-Architected Framework pillar that focuses on the ability of a system to recover from infrastructure or service disruptions?", options: ["Operational Excellence", "Security", "Reliability", "Performance Efficiency"], correctAnswer: 2, explanation: "The Reliability pillar focuses on ensuring a workload performs its intended function correctly and consistently when it’s expected to. This includes the ability to operate and test the workload through its total lifecycle." },
+            { id: 8, question: "Which AWS service allows you to manage infrastructure as code?", options: ["AWS CodeDeploy", "AWS CloudFormation", "AWS OpsWorks", "AWS Config"], correctAnswer: 1, explanation: "AWS CloudFormation provides an easy way to model a collection of related AWS and third-party resources, provision them quickly and consistently, and manage them throughout their lifecycles, by treating infrastructure as code." },
+            { id: 9, question: "What AWS service provides a managed relational database service?", options: ["Amazon DynamoDB", "Amazon ElastiCache", "Amazon RDS", "Amazon Redshift"], correctAnswer: 2, explanation: "Amazon Relational Database Service (RDS) makes it easy to set up, operate, and scale a relational database in the cloud." },
+            { id: 10, question: "Which AWS global infrastructure component consists of one or more discrete data centers with redundant power, networking, and connectivity?", options: ["Region", "Edge Location", "Availability Zone", "Local Zone"], correctAnswer: 2, explanation: "An Availability Zone (AZ) is one or more discrete data centers with redundant power, networking, and connectivity in an AWS Region." },
+            { id: 11, question: "What AWS service is used for long-term, low-cost archival storage?", options: ["Amazon S3 Standard", "Amazon S3 Glacier Deep Archive", "Amazon EBS", "Amazon EFS"], correctAnswer: 1, explanation: "Amazon S3 Glacier Deep Archive is Amazon S3’s lowest-cost storage class and supports long-term retention and digital preservation for data that may be accessed once or twice in a year." },
+            { id: 12, question: "Which AWS service helps you to assess, audit, and evaluate the configurations of your AWS resources?", options: ["Amazon CloudWatch", "AWS Trusted Advisor", "AWS Config", "AWS CloudTrail"], correctAnswer: 2, explanation: "AWS Config is a service that enables you to assess, audit, and evaluate the configurations of your AWS resources. Config continuously monitors and records your AWS resource configurations and allows you to automate the evaluation of recorded configurations against desired configurations." },
+            { id: 13, question: "What is the concept of 'Elasticity' in cloud computing?", options: ["Paying only for what you use", "The ability to scale resources up or down automatically", "Distributing traffic across multiple servers", "Securing your cloud resources"], correctAnswer: 1, explanation: "Elasticity is the ability to acquire resources as you need them and release resources when you no longer need them. In the cloud, this means you can scale your resources up or down based on demand." },
+            { id: 14, question: "Which AWS service provides managed message queues for microservices, distributed systems, and serverless applications?", options: ["Amazon SNS", "Amazon SQS", "Amazon MQ", "AWS Step Functions"], correctAnswer: 1, explanation: "Amazon Simple Queue Service (SQS) is a fully managed message queuing service that enables you to decouple and scale microservices, distributed systems, and serverless applications." },
+            { id: 15, question: "What is the primary purpose of AWS Identity and Access Management (IAM)?", options: ["To monitor application performance", "To manage users, groups, roles, and their access to AWS services", "To provide a virtual private network", "To automate software deployments"], correctAnswer: 1, explanation: "AWS IAM is used to securely control access to AWS services and resources for your users. You can create and manage AWS users and groups, and use permissions to allow and deny their access to AWS resources." },
+            { id: 16, question: "Which AWS service can be used to host a static website?", options: ["Amazon EC2", "AWS Lambda", "Amazon S3", "Amazon Lightsail"], correctAnswer: 2, explanation: "Amazon S3 can be configured to host a static website. This is a cost-effective and scalable solution for websites that do not require server-side scripting." },
+            { id: 17, question: "What AWS offering allows you to establish a dedicated, private network connection from your premises to AWS?", options: ["AWS VPN", "Amazon VPC Peering", "AWS Direct Connect", "AWS Transit Gateway"], correctAnswer: 2, explanation: "AWS Direct Connect makes it easy to establish a dedicated network connection from your premises to AWS. This can reduce network costs, increase bandwidth throughput, and provide a more consistent network experience." },
+            { id: 18, question: "Which pricing model allows EC2 users to bid on unused EC2 capacity and run instances for as long as their bid exceeds the current Spot price?", options: ["On-Demand Instances", "Reserved Instances", "Spot Instances", "Dedicated Hosts"], correctAnswer: 2, explanation: "Spot Instances let you take advantage of unused EC2 capacity in the AWS cloud. Spot Instances are available at up to a 90% discount compared to On-Demand prices." },
+            { id: 19, question: "Which AWS service provides a fully managed search service based on Elasticsearch?", options: ["Amazon CloudSearch", "Amazon OpenSearch Service (successor to Amazon Elasticsearch Service)", "Amazon Kendra", "Amazon Textract"], correctAnswer: 1, explanation: "Amazon OpenSearch Service is a managed service that makes it easy to deploy, operate, and scale OpenSearch (or legacy Elasticsearch) clusters in the AWS Cloud." },
+            { id: 20, question: "What is an AWS Region?", options: ["A single data center", "A collection of Edge Locations", "A physical location around the world where AWS clusters data centers", "A specific endpoint for an AWS service"], correctAnswer: 2, explanation: "An AWS Region is a physical geographic location around the world where AWS clusters data centers. Each Region consists of multiple, isolated, and physically separate Availability Zones." },
+            { id: 21, question: "Which AWS service helps in distributing incoming application traffic across multiple targets, such as EC2 instances?", options: ["Amazon Route 53", "Elastic Load Balancing (ELB)", "AWS Auto Scaling", "Amazon API Gateway"], correctAnswer: 1, explanation: "Elastic Load Balancing automatically distributes incoming application traffic across multiple targets, such as Amazon EC2 instances, containers, IP addresses, and Lambda functions." },
+            { id: 22, question: "Which AWS service provides data warehousing capabilities?", options: ["Amazon RDS", "Amazon DynamoDB", "Amazon Redshift", "Amazon ElastiCache"], correctAnswer: 2, explanation: "Amazon Redshift is a fast, scalable data warehouse that makes it simple and cost-effective to analyze all your data across your data warehouse and data lake." },
+            { id: 23, question: "What AWS tool provides recommendations to help you follow AWS best practices, reduce costs, and improve performance and security?", options: ["AWS Cost Explorer", "AWS Budgets", "AWS Trusted Advisor", "Amazon Inspector"], correctAnswer: 2, explanation: "AWS Trusted Advisor is an online tool that provides you real-time guidance to help you provision your resources following AWS best practices on cost optimization, security, fault tolerance, performance, and service limits." },
+            { id: 24, question: "Which of the following is a responsibility of AWS under the Shared Responsibility Model?", options: ["Securing application data", "Managing guest operating systems", "Security OF the Cloud (e.g., physical security of data centers)", "Setting up IAM user permissions"], correctAnswer: 2, explanation: "Under the AWS Shared Responsibility Model, AWS is responsible for the security OF the Cloud, which includes the hardware, software, networking, and facilities that run AWS Cloud services. Customers are responsible for security IN the Cloud." },
+            { id: 25, question: "A company is planning to launch a new system in AWS but they do not have an employee who has AWS-related expertise. Which of the following AWS channels can instead help the company design, architect, build, migrate, and manage their workloads and applications on AWS?", options: ["AWS Enterprise Support", "AWS Partner Network Consulting Partners", "AWS Professional Services", "AWS Technical Account Manager"], correctAnswer: 1, explanation: "AWS Partner Network (APN) Consulting Partners are professional services firms that help customers of all types and sizes design, architect, build, migrate, and manage their workloads and applications on AWS." },
+            { id: 26, question: "A group of Software Engineers is working on a project that requires a new Microsoft SQL Server database to be hosted in AWS. The team needs to ensure that the database can be set up quickly and efficiently. Which AWS service should they primarily use?", options: ["Amazon EC2 with SQL Server installed", "Amazon RDS for SQL Server", "Amazon DynamoDB", "Amazon Aurora"], correctAnswer: 1, explanation: "Amazon RDS for SQL Server makes it easy to set up, operate, and scale SQL Server deployments in the cloud, automating many administration tasks." },
+            { id: 27, question: "A company is using multiple AWS services to host its application. It wants to ensure the environment is optimized by adhering to AWS best practices. Which service inspects an AWS environment and makes recommendations to lower expenditures, improve system performance and reliability, and close security gaps?", options: ["AWS Cost Explorer", "AWS Trusted Advisor", "AWS Budgets", "Amazon Inspector"], correctAnswer: 1, explanation: "AWS Trusted Advisor provides real-time guidance to help you provision your resources following AWS best practices across cost optimization, security, fault tolerance, performance, and service limits." },
+            { id: 28, question: "Which AWS service should be used to monitor API calls made to AWS services, including who made the call, when, and from what IP address?", options: ["Amazon CloudWatch", "AWS CloudTrail", "AWS Config", "AWS X-Ray"], correctAnswer: 1, explanation: "AWS CloudTrail records API calls made in your AWS account, providing a history of actions, essential for auditing and troubleshooting." },
+            { id: 29, question: "What advantages does a database administrator obtain by using the Amazon Relational Database Service (RDS)?", options: ["RDS provides 99.99999999999% reliability and durability.", "RDS databases automatically scale based on load.", "RDS enables users to dynamically adjust CPU and RAM resources without downtime.", "RDS simplifies relational database administration tasks."], correctAnswer: 3, explanation: "Amazon RDS manages common administrative tasks such as patching, backups, provisioning, and hardware setup, simplifying database management." },
+            { id: 30, question: "A large company is interested in avoiding long-term contracts and moving from fixed costs to variable costs. What is the value proposition of AWS for this company?", options: ["Economies of scale", "Pay-as-you-go pricing", "Volume pricing discounts", "Automated cost optimization"], correctAnswer: 1, explanation: "Pay-as-you-go pricing allows companies to pay only for the resources they consume, converting capital expenses (fixed costs) to operational expenses (variable costs)." },
+            { id: 31, question: "A customer needs to determine Total Cost of Ownership (TCO) for a workload that requires physical isolation. Which hosting model should be used?", options: ["Dedicated Hosts", "Reserved Instances", "On-Demand Instances", "Spot Instances"], correctAnswer: 0, explanation: "Amazon EC2 Dedicated Hosts provide physical servers dedicated for your use, which can help meet compliance requirements or licensing terms that require physical isolation." },
+            { id: 32, question: "Which design principle is most directly enabled by the AWS Cloud to improve the operation of workloads by distributing components?", options: ["Minimize platform design", "Loose coupling", "Customized hardware", "Minimum viable product"], correctAnswer: 1, explanation: "Loose coupling, often achieved using services like SQS or SNS, reduces interdependencies between system components, improving resilience and scalability." },
+            { id: 33, question: "A user is planning to launch three EC2 instances behind a single Elastic Load Balancer. The deployment should be highly available. What is the best approach?", options: ["Launch the instances across multiple Availability Zones in a single AWS Region.", "Launch the instances as EC2 Spot Instances in the same AWS Region and the same Availability Zone.", "Launch the instances in multiple AWS Regions, and use Elastic IP addresses.", "Launch the instances as EC2 Reserved Instances in the same AWS Region, but in different Availability Zones."], correctAnswer: 0, explanation: "Distributing instances across multiple Availability Zones within a single Region is a key strategy for achieving high availability for applications." },
+            { id: 34, question: "Which AWS tool allows you to set custom spending limits and receive alerts when your costs or usage exceed (or are forecasted to exceed) your budgeted amount?", options: ["AWS Cost Explorer", "Amazon EC2", "AWS Budgets", "AWS Identity and Access Management (IAM)"], correctAnswer: 2, explanation: "AWS Budgets allows you to set custom budgets to track your cost and usage and alerts you when thresholds are breached." },
+            { id: 35, question: "Which AWS service is primarily used for object storage?", options: ["Amazon EBS", "Amazon S3", "Amazon EFS", "Amazon Glacier"], correctAnswer: 1, explanation: "Amazon Simple Storage Service (Amazon S3) is an object storage service offering scalability, data availability, security, and performance." },
+            { id: 36, question: "In the AWS Shared Responsibility Model, which of the following is a customer responsibility?", options: ["Physical security of data centers", "Managing AWS global infrastructure", "Configuration of security groups and network ACLs", "Patching the hypervisor"], correctAnswer: 2, explanation: "Customers are responsible for security 'in' the cloud, which includes configuring security groups, network ACLs, managing data, and user access." },
+            { id: 37, question: "A company wants to develop an application that requires sending, storing, and receiving messages across its components in a first-in, first-out (FIFO) delivery process. Which AWS service should be used?", options: ["AWS Glue", "Amazon Kinesis Data Streams", "AWS Step Functions", "Amazon SQS"], correctAnswer: 3, explanation: "Amazon SQS (Simple Queue Service) offers FIFO queues that preserve the exact order in which messages are sent and received." },
+            { id: 38, question: "AWS allows users to manage their resources using a web based user interface. What is the name of this interface?", options: ["AWS CLI", "AWS SDK", "AWS Management Console", "AWS API"], correctAnswer: 2, explanation: "The AWS Management Console is a web-based interface for accessing and managing AWS services." },
+            { id: 39, question: "You have noticed that several critical Amazon EC2 instances have been terminated. Which AWS service would help you determine who took this action?", options: ["Amazon CloudWatch", "AWS Config", "AWS CloudTrail", "AWS IAM Analyzer"], correctAnswer: 2, explanation: "AWS CloudTrail records API calls made in your AWS account, providing a history of actions, including who made the call and when." },
+            { id: 40, question: "What does Amazon CloudFront use to distribute content to global users with low latency?", options: ["AWS Regions", "Availability Zones", "Edge Locations", "Local Zones"], correctAnswer: 2, explanation: "Amazon CloudFront uses a global network of Edge Locations to cache content closer to users, reducing latency." },
+            { id: 41, question: "What does the 'Principle of Least Privilege' refer to?", options: ["Granting only the permissions required to perform a task.", "Minimizing the number of IAM users.", "Using only the cheapest AWS services.", "Allowing all actions by default and denying specific ones."], correctAnswer: 0, explanation: "The Principle of Least Privilege is a security best practice of granting only the minimum permissions necessary for a user or service to perform its tasks." },
+            { id: 42, question: "A company wants to migrate its on-premises Oracle database to AWS. They require a managed database service that offers Oracle compatibility. Which AWS service is most suitable?", options: ["Amazon DynamoDB", "Amazon Aurora", "Amazon RDS for Oracle", "Amazon Redshift"], correctAnswer: 2, explanation: "Amazon RDS for Oracle allows you to run a managed Oracle database instance in the AWS cloud, handling common administration tasks." },
+            { id: 43, question: "Which AWS service provides a way to automate infrastructure provisioning using templates written in JSON or YAML?", options: ["AWS Elastic Beanstalk", "AWS OpsWorks", "AWS CloudFormation", "AWS CodeDeploy"], correctAnswer: 2, explanation: "AWS CloudFormation allows you to model and provision your AWS infrastructure resources using templates, automating the creation and management of your environment." },
+            { id: 44, question: "What is the primary benefit of using AWS Auto Scaling for EC2 instances?", options: ["Reduced storage costs", "Automated data backups", "Improved application availability and cost optimization by adjusting capacity to demand", "Enhanced network security"], correctAnswer: 2, explanation: "AWS Auto Scaling helps maintain application availability and allows you to automatically scale your EC2 capacity up or down according to conditions you define, optimizing performance and cost." },
+            { id: 45, question: "Which AWS service offers a petabyte-scale data warehousing solution designed for analytics?", options: ["Amazon RDS", "Amazon DynamoDB", "Amazon S3", "Amazon Redshift"], correctAnswer: 3, explanation: "Amazon Redshift is a fast, fully managed, petabyte-scale data warehouse service that makes it simple and cost-effective to analyze all your data." },
+            { id: 46, question: "A developer needs to store and manage Docker container images for their applications. Which AWS service should they use?", options: ["Amazon S3", "Amazon ECR (Elastic Container Registry)", "Amazon EBS", "AWS CodeCommit"], correctAnswer: 1, explanation: "Amazon Elastic Container Registry (ECR) is a fully-managed Docker container registry for storing, managing, and deploying container images." },
+            { id: 47, question: "Which AWS support plan provides access to a designated Technical Account Manager (TAM)?", options: ["Basic Support", "Developer Support", "Business Support", "Enterprise Support"], correctAnswer: 3, explanation: "The AWS Enterprise Support plan includes a designated Technical Account Manager (TAM) for proactive guidance and advocacy." },
+            { id: 48, question: "What AWS service would you use to create a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define?", options: ["AWS Direct Connect", "Amazon Route 53", "Amazon VPC (Virtual Private Cloud)", "AWS Shield"], correctAnswer: 2, explanation: "Amazon Virtual Private Cloud (VPC) lets you provision a logically isolated section of the AWS Cloud, giving you control over your virtual networking environment." },
+            { id: 49, question: "Which of the following is a key benefit of using AWS Lambda?", options: ["Persistent block storage for EC2 instances", "Running code without provisioning or managing servers (serverless compute)", "A dedicated physical server for exclusive use", "A managed relational database service with automatic patching"], correctAnswer: 1, explanation: "AWS Lambda is a serverless compute service that runs your code in response to events and automatically manages the underlying compute resources for you." },
+            { id: 50, question: "A company wants to ensure that its AWS resources are configured according to internal policies and best practices. Which service can continuously monitor and record resource configurations and evaluate them against desired rules?", options: ["Amazon CloudWatch", "AWS Trusted Advisor", "AWS Config", "AWS Systems Manager"], correctAnswer: 2, explanation: "AWS Config continuously monitors and records your AWS resource configurations and allows you to automate the evaluation of recorded configurations against desired configurations." },
+            { id: 51, question: "Which AWS service is designed to protect your web applications from common web exploits like SQL injection or cross-site scripting (XSS)?", options: ["AWS Shield Standard", "AWS WAF (Web Application Firewall)", "Amazon GuardDuty", "AWS Network Firewall"], correctAnswer: 1, explanation: "AWS WAF is a web application firewall that helps protect your web applications or APIs against common web exploits." },
+            { id: 52, question: "What is the primary purpose of an AWS Availability Zone (AZ)?", options: ["To provide a global content delivery network", "To offer a separate geographic location for disaster recovery across continents", "To provide isolated locations within an AWS Region for high availability and fault tolerance", "To manage billing and account information for a specific country"], correctAnswer: 2, explanation: "Availability Zones are distinct locations within an AWS Region engineered to be isolated from failures in other AZs, enabling high availability and fault tolerance." },
+            { id: 53, question: "A company needs to transfer terabytes of data from their on-premises data center to Amazon S3 but has limited internet bandwidth. Which AWS service offers a physical device to accelerate this data transfer?", options: ["AWS Direct Connect", "AWS Snowball", "AWS Storage Gateway", "Amazon S3 Transfer Acceleration"], correctAnswer: 1, explanation: "AWS Snowball is a petabyte-scale data transport solution that uses secure physical appliances to transfer large amounts of data into and out of AWS." },
+            { id: 54, question: "Which AWS service provides a simple and scalable way to manage user identities and control access to AWS services and resources?", options: ["AWS Directory Service", "AWS Single Sign-On (AWS SSO)", "AWS Identity and Access Management (IAM)", "Amazon Cognito"], correctAnswer: 2, explanation: "AWS Identity and Access Management (IAM) enables you to securely manage access to AWS services and resources by creating and managing users, groups, and permissions." }
+        ];
+
+        // Firebase State
+        let fbApp;
+        let fbAuth;
+        let fbDb;
+        let currentUserId;
+        let isAuthReady = false;
+
+        // Quiz State (remains the same)
+        let currentQuestions = [];
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let timerInterval;
+        let initialTimeForRound = 90 * 60;
+        let timeLeft = initialTimeForRound;
+        const questionsPerRound = 50;
+        let selectedAnswerIndex = null;
+        let quizActive = false;
+        let sessionIncorrectQuestionIds = [];
+
+        // DOM Elements (remains the same, ensure IDs match HTML)
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const startQuizButton = document.getElementById('start-quiz-button');
+        const timerDisplay = document.getElementById('timer');
+        const questionCounterDisplay = document.getElementById('question-counter');
+        const progressBar = document.getElementById('progress-bar');
+        const questionArea = document.getElementById('question-area');
+        const questionTextDisplay = document.getElementById('question-text');
+        const answerOptionsContainer = document.getElementById('answer-options');
+        const explanationArea = document.getElementById('explanation-area');
+        const explanationTextDisplay = document.getElementById('explanation-text');
+        const confirmButton = document.getElementById('confirm-button');
+        const resultsTitle = document.getElementById('results-title');
+        const resultsScoreDisplay = document.getElementById('results-score');
+        const resultsSummaryDisplay = document.getElementById('results-summary');
+        const resultsTimeDisplay = document.getElementById('results-time');
+        const rememberSessionButton = document.getElementById('remember-session-button');
+        const deleteSessionButton = document.getElementById('delete-session-button');
+        const restartQuizButtonResults = document.getElementById('restart-quiz-button-results');
+        const sessionStatusMessage = document.getElementById('session-status-message');
+        const startScreenMessage = document.getElementById('start-screen-message');
+
+
+        // --- Firebase Initialization and Auth ---
+        async function initializeFirebase() {
+            try {
+                const firebaseConfigString = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+                if (!firebaseConfigString) {
+                    console.warn("Firebase config not found. Firestore features will be disabled.");
+                    startScreenMessage.textContent = "Note: Session saving/loading disabled (Firebase not configured).";
+                    isAuthReady = true; 
+                    fbDb = null; // Explicitly nullify
+                    currentUserId = null; // Explicitly nullify
+                    return;
+                }
+                const firebaseConfig = JSON.parse(firebaseConfigString);
+                fbApp = initializeApp(firebaseConfig);
+                fbAuth = getAuth(fbApp);
+                fbDb = getFirestore(fbApp);
+                // setLogLevel('debug'); // Keep this commented unless debugging Firebase
+
+                await new Promise((resolve, reject) => {
+                    const unsubscribe = onAuthStateChanged(fbAuth, async (user) => {
+                        unsubscribe(); 
+                        if (user) {
+                            currentUserId = user.uid;
+                            console.log("User is signed in with UID:", currentUserId);
+                            isAuthReady = true;
+                            resolve(user);
+                        } else {
+                            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                            try {
+                                if (initialAuthToken) {
+                                    await signInWithCustomToken(fbAuth, initialAuthToken);
+                                    console.log("Signed in with custom token.");
+                                } else {
+                                    await signInAnonymously(fbAuth);
+                                    console.log("Signed in anonymously.");
+                                }
+                                currentUserId = fbAuth.currentUser?.uid || crypto.randomUUID(); 
+                                isAuthReady = true;
+                                resolve(fbAuth.currentUser);
+                            } catch (error) {
+                                console.error("Error during sign-in:", error);
+                                currentUserId = crypto.randomUUID(); 
+                                isAuthReady = true; 
+                                startScreenMessage.textContent = "Warning: Could not authenticate for session saving.";
+                                fbDb = null; // Nullify fbDb on auth error too
+                                resolve(null); 
+                            }
+                        }
+                    }, (error) => {
+                        console.error("Auth state change error:", error);
+                        currentUserId = crypto.randomUUID();
+                        isAuthReady = true;
+                        startScreenMessage.textContent = "Warning: Auth error, session saving may fail.";
+                        fbDb = null; // Nullify fbDb
+                        resolve(null); // Resolve to allow app to continue without blocking
+                    });
+                });
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                startScreenMessage.textContent = "Critical: Firebase setup failed. Session features unavailable.";
+                isAuthReady = true; 
+                fbDb = null; // Nullify fbDb
+                currentUserId = null; // Nullify currentUserId
+            }
+        }
+        
+        // --- Event Listeners ---
+        startQuizButton.addEventListener('click', async () => {
+            if (!isAuthReady) {
+                startScreenMessage.textContent = "Initializing session features, please wait...";
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                if (!isAuthReady) { // Re-check after delay
+                     startScreenMessage.textContent = "Session features could not be initialized. Starting quiz locally.";
+                }
+            }
+            startQuiz();
+        });
+        confirmButton.addEventListener('click', handleConfirmClick);
+        rememberSessionButton.addEventListener('click', rememberIncorrectAnswers);
+        deleteSessionButton.addEventListener('click', deleteIncorrectAnswersSession);
+        restartQuizButtonResults.addEventListener('click', startQuiz);
+
+        // --- Core Functions (shuffleArray, loadQuestion, selectAnswer, handleConfirmClick, startTimer, updateTimerDisplay, updateProgressBar remain largely the same) ---
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        async function startQuiz() {
+            showScreen(quizScreen);
+            hideScreen(startScreen);
+            hideScreen(resultsScreen);
+            sessionStatusMessage.classList.add('hidden');
+
+            let savedIncorrectIds = [];
+            if (fbDb && currentUserId) { 
+                try {
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                    const docRef = doc(fbDb, `artifacts/${appId}/users/${currentUserId}/aws_clf_c02_quiz_incorrect_questions/sessionData`);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists() && docSnap.data().incorrectIds) {
+                        savedIncorrectIds = docSnap.data().incorrectIds;
+                        console.log("Loaded incorrect question IDs from previous session:", savedIncorrectIds);
+                    }
+                } catch (error) {
+                    console.error("Error loading incorrect questions from Firestore:", error);
+                }
+            }
+
+            let questionsForRound = [];
+            if (savedIncorrectIds.length > 0) {
+                const incorrectQsObjects = allQuestions.filter(q => savedIncorrectIds.includes(q.id));
+                let otherQsObjects = allQuestions.filter(q => !savedIncorrectIds.includes(q.id));
+                
+                shuffleArray(otherQsObjects); 
+                
+                questionsForRound = incorrectQsObjects.concat(otherQsObjects);
+                // Ensure we don't exceed questionsPerRound, but keep all incorrect ones if possible
+                if (questionsForRound.length > questionsPerRound) {
+                    if (incorrectQsObjects.length >= questionsPerRound) {
+                        questionsForRound = incorrectQsObjects.slice(0, questionsPerRound);
+                    } else {
+                         questionsForRound = incorrectQsObjects.concat(otherQsObjects.slice(0, questionsPerRound - incorrectQsObjects.length));
+                    }
+                }
+            } else {
+                const tempAllQuestions = [...allQuestions];
+                shuffleArray(tempAllQuestions);
+                questionsForRound = tempAllQuestions.slice(0, Math.min(questionsPerRound, allQuestions.length));
+            }
+            
+            shuffleArray(questionsForRound); 
+            currentQuestions = questionsForRound;
+
+            if (currentQuestions.length === 0) {
+                alert("No questions available. Please check the question bank."); // Keep alert for critical error
+                showScreen(startScreen);
+                hideScreen(quizScreen);
+                return;
+            }
+
+            currentQuestionIndex = 0;
+            score = 0;
+            timeLeft = initialTimeForRound;
+            selectedAnswerIndex = null;
+            quizActive = true;
+            sessionIncorrectQuestionIds = []; 
+            
+            updateProgressBar(); 
+            loadQuestion();
+            startTimer();
+        }
+
+        function loadQuestion() {
+            if (currentQuestionIndex >= currentQuestions.length) {
+                endQuiz(false); 
+                return;
+            }
+            const questionData = currentQuestions[currentQuestionIndex];
+            questionArea.classList.add('question-area-exit');
+            
+            setTimeout(() => {
+                questionTextDisplay.textContent = questionData.question;
+                answerOptionsContainer.innerHTML = ''; 
+                questionData.options.forEach((option, index) => {
+                    const button = document.createElement('button');
+                    button.classList.add('w-full', 'text-left', 'p-4', 'rounded-lg', 'border-2', 'border-slate-300', 'hover:border-blue-500', 'hover:bg-blue-50', 'transition-all', 'duration-150', 'ease-in-out', 'focus:outline-none', 'focus:ring-2', 'focus:ring-blue-400');
+                    button.textContent = `${String.fromCharCode(65 + index)}. ${option}`;
+                    button.dataset.index = index;
+                    button.disabled = false; 
+                    button.addEventListener('click', () => selectAnswer(index, button));
+                    answerOptionsContainer.appendChild(button);
+                });
+                questionCounterDisplay.textContent = `Question ${currentQuestionIndex + 1}/${currentQuestions.length}`;
+                confirmButton.textContent = 'Confirm';
+                confirmButton.disabled = true; 
+                explanationArea.classList.add('hidden');
+                selectedAnswerIndex = null;
+                questionArea.classList.remove('question-area-exit');
+                questionArea.classList.add('question-area-enter');
+                requestAnimationFrame(() => {
+                    questionArea.classList.remove('question-area-enter');
+                });
+            }, 300); 
+        }
+
+        function selectAnswer(index, buttonElement) {
+            if (confirmButton.textContent !== 'Confirm') return;
+            Array.from(answerOptionsContainer.children).forEach(btn => {
+                btn.classList.remove('btn-selected', 'border-blue-500', 'bg-blue-100');
+                btn.classList.add('border-slate-300');
+                btn.classList.remove('correct-answer-pop');
+            });
+            buttonElement.classList.add('btn-selected', 'border-blue-500', 'bg-blue-100');
+            buttonElement.classList.remove('border-slate-300');
+            selectedAnswerIndex = index;
+            confirmButton.disabled = false;
+            buttonElement.style.transform = 'scale(0.97)';
+            setTimeout(() => buttonElement.style.transform = 'scale(1.0)', 100);
+        }
+
+        function handleConfirmClick() {
+            if (confirmButton.textContent === 'Confirm') {
+                if (selectedAnswerIndex === null) return; 
+                const questionData = currentQuestions[currentQuestionIndex];
+                const correct = parseInt(selectedAnswerIndex) === questionData.correctAnswer;
+                Array.from(answerOptionsContainer.children).forEach(btn => {
+                    btn.disabled = true;
+                    btn.classList.remove('hover:border-blue-500', 'hover:bg-blue-50'); 
+                });
+                const selectedButton = answerOptionsContainer.children[selectedAnswerIndex];
+                const correctButton = answerOptionsContainer.children[questionData.correctAnswer];
+                if (correct) {
+                    score++;
+                    selectedButton.classList.add('btn-correct', 'correct-answer-pop');
+                } else {
+                    selectedButton.classList.add('btn-user-selected-incorrect'); 
+                    correctButton.classList.add('btn-correct', 'correct-answer-pop'); 
+                    sessionIncorrectQuestionIds.push(questionData.id); 
+                }
+                explanationTextDisplay.textContent = questionData.explanation;
+                explanationArea.classList.remove('hidden');
+                if (currentQuestionIndex === currentQuestions.length - 1) {
+                    confirmButton.textContent = 'Finish Quiz';
+                } else {
+                    confirmButton.textContent = 'Next Question';
+                }
+            } else if (confirmButton.textContent === 'Next Question') {
+                currentQuestionIndex++;
+                updateProgressBar();
+                loadQuestion(); 
+            } else if (confirmButton.textContent === 'Finish Quiz') {
+                endQuiz(false); 
+            }
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval); 
+            updateTimerDisplay(); 
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    endQuiz(true); 
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timerDisplay.textContent = `Time Left: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function updateProgressBar() {
+            const progressPercentage = currentQuestions.length > 0 ? ((currentQuestionIndex) / currentQuestions.length) * 100 : 0;
+            progressBar.style.width = `${progressPercentage}%`;
+        }
+        
+        function endQuiz(timeUp) {
+            quizActive = false;
+            clearInterval(timerInterval);
+            if (timeUp || currentQuestionIndex >= currentQuestions.length -1 ) {
+                 progressBar.style.width = `100%`;
+            }
+            showScreen(resultsScreen);
+            hideScreen(quizScreen);
+
+            // Updated: Manage visibility of session buttons
+            if (fbDb && currentUserId) {
+                rememberSessionButton.classList.remove('hidden');
+                deleteSessionButton.classList.remove('hidden');
+                // Clear previous status message if any, or set a default non-error one
+                sessionStatusMessage.classList.add('hidden'); 
+            } else {
+                rememberSessionButton.classList.add('hidden');
+                deleteSessionButton.classList.add('hidden');
+                showSessionStatus("Session features (saving/loading incorrect answers) are disabled in this environment.", "info");
+            }
+
+            let attemptedCount;
+            if (currentQuestionIndex >= currentQuestions.length) { 
+                attemptedCount = currentQuestions.length;
+            } else { 
+                if (confirmButton.textContent === 'Next Question' || confirmButton.textContent === 'Finish Quiz') {
+                    attemptedCount = currentQuestionIndex + 1;
+                } else {
+                    attemptedCount = currentQuestionIndex;
+                }
+            }
+            attemptedCount = Math.min(attemptedCount, currentQuestions.length);
+            attemptedCount = Math.max(0, attemptedCount);
+            const percentage = attemptedCount > 0 ? (score / attemptedCount) * 100 : 0;
+            resultsTitle.textContent = timeUp ? "Time's Up!" : "Quiz Completed!";
+            resultsScoreDisplay.textContent = `Your Score: ${percentage.toFixed(0)}%`;
+            resultsSummaryDisplay.textContent = `You answered ${score} out of ${attemptedCount} questions correctly (from ${currentQuestions.length} in this round).`;
+            const timeTakenSecs = initialTimeForRound - timeLeft;
+            const minutesTaken = Math.floor(timeTakenSecs / 60);
+            const secondsTaken = timeTakenSecs % 60;
+            resultsTimeDisplay.textContent = `Time Taken: ${String(minutesTaken).padStart(2, '0')}:${String(secondsTaken).padStart(2, '0')}`;
+        }
+
+        async function rememberIncorrectAnswers() {
+            if (!fbDb || !currentUserId) {
+                showSessionStatus("Session features not available (Firebase not ready).", "error");
+                return;
+            }
+            if (sessionIncorrectQuestionIds.length === 0) {
+                showSessionStatus("No incorrect answers to remember from this round.", "info");
+                 // Optionally clear any previously stored session if no new incorrect answers.
+                // This prevents an old list of incorrect questions from persisting if the user gets 100%
+                // and then clicks "Remember".
+                // await deleteIncorrectAnswersSession(false); // Pass false to not show user message for this auto-clear
+                return;
+            }
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const docRef = doc(fbDb, `artifacts/${appId}/users/${currentUserId}/aws_clf_c02_quiz_incorrect_questions/sessionData`);
+                await setDoc(docRef, { incorrectIds: sessionIncorrectQuestionIds });
+                console.log("Incorrect answers saved to Firestore:", sessionIncorrectQuestionIds);
+                showSessionStatus("Your incorrect answers have been remembered for the next session!", "success");
+            } catch (error) {
+                console.error("Error saving incorrect answers to Firestore:", error);
+                showSessionStatus("Could not remember incorrect answers. Please try again.", "error");
+            }
+        }
+
+        async function deleteIncorrectAnswersSession(showMessage = true) {
+            if (!fbDb || !currentUserId) {
+                if(showMessage) showSessionStatus("Session features not available (Firebase not ready).", "error");
+                return;
+            }
+            try {
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const docRef = doc(fbDb, `artifacts/${appId}/users/${currentUserId}/aws_clf_c02_quiz_incorrect_questions/sessionData`);
+                await deleteDoc(docRef);
+                console.log("Incorrect answers session deleted from Firestore.");
+                if(showMessage) showSessionStatus("Your remembered incorrect answers have been forgotten.", "success");
+            } catch (error) {
+                console.error("Error deleting incorrect answers session from Firestore:", error);
+                 if(showMessage) showSessionStatus("Could not forget incorrect answers. Please try again.", "error");
+            }
+        }
+        
+        function showSessionStatus(message, type = "info") {
+            sessionStatusMessage.textContent = message;
+            sessionStatusMessage.className = 'status-message'; 
+            if (type === "success") {
+                sessionStatusMessage.classList.add('status-success');
+            } else if (type === "error") {
+                sessionStatusMessage.classList.add('status-error');
+            } else { // "info"
+                sessionStatusMessage.classList.add('status-info');
+            }
+            sessionStatusMessage.classList.remove('hidden');
+        }
+
+        function showScreen(screenElement) {
+            screenElement.classList.remove('page-hidden', 'absolute');
+            screenElement.classList.add('page-visible');
+            screenElement.style.position = 'relative'; 
+        }
+
+        function hideScreen(screenElement) {
+            screenElement.classList.remove('page-visible');
+            screenElement.classList.add('page-hidden');
+            setTimeout(() => {
+                if (screenElement.classList.contains('page-hidden')) {
+                     screenElement.style.position = 'absolute';
+                }
+            }, 500); 
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Ensure session buttons are hidden by default, JS will manage visibility
+            rememberSessionButton.classList.add('hidden');
+            deleteSessionButton.classList.add('hidden');
+            
+            await initializeFirebase(); 
+            hideScreen(quizScreen);
+            hideScreen(resultsScreen);
+            showScreen(startScreen); 
+            startScreen.style.position = 'relative';
+            quizScreen.style.position = 'absolute'; 
+            resultsScreen.style.position = 'absolute';
+        });
+
+    </script>
+</body>
+</html>
+
