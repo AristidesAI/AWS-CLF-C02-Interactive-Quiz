@@ -5,6 +5,7 @@ Hi there, I was studying for the AWS CLF-C02 certification and found practise te
 ## Features:
 - Randomized Questions 50/50
 - 90min Timer
+- Answer Explinations; Read the theory behind the answer and further understand the topic
 - Percentage Score
 - Session Memory; The next time you take the quiz, your previous incorrect answers will be asked again to assist in memorization
 - Interactive elements
